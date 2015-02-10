@@ -54,7 +54,7 @@ Mat camMatrix;
 double rot[9] = { 0 };
 Vec3d eav;
 
-Mat img_object = imread("Resources\\book.jpg", CV_LOAD_IMAGE_GRAYSCALE);
+Mat img_object = imread("Resources\\book.png", CV_LOAD_IMAGE_GRAYSCALE);
 //Mat img_scene = imread("book2.jpg", CV_LOAD_IMAGE_GRAYSCALE);
 VideoCapture cap("Resources\\video.mp4");
 Mat img_scene;
@@ -822,71 +822,18 @@ void displayGridAndAxis(){
 
 }
 
-void mydisplay()
-{
 
-
-
-	//GLUUUUT
-	/*-----------------------------------------------------------------------------------------------*/
-	/*-----------------------------------------------------------------------------------------------*/
-	/*-----------------------------------------------------------------------------------------------*/
-	/*A IDEIA É SUBSTITUIR AS MATRIZES Ri Rj Rk por _r[0...8] e T[] por tvec*/
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_CULL_FACE);
-	glEnable(GL_TEXTURE_2D);
-	glEnable(GL_LIGHTING);
-
-	glClearColor(0, 0, 0, 0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glLoadIdentity();
-
-	//calculando R*C
-
-	T[0] = Ri[0] * C[0] + Rj[0] * C[1] + Rk[0] * C[2];
-	T[1] = Ri[1] * C[0] + Rj[1] * C[1] + Rk[1] * C[2];
-	T[2] = Ri[2] * C[0] + Rj[2] * C[1] + Rk[2] * C[2];
-
-
-
-
-	//obs.: tanto R quanto T estão transpostas por conta do formato de modelview exigido pelo OpenGL
-	GLfloat parametrosExtrinsecos[16] = {
-		Ri[0], Ri[1], Ri[2], 0.0f,
-		Rj[0], Rj[1], Rj[2], 0.0f,
-		Rk[0], Rk[1], Rk[2], 0.0f,
-		T[0], T[1], T[2], 1.0f };
-
-
-
-	glMatrixMode(GL_MODELVIEW);
-	glLoadMatrixf(parametrosExtrinsecos);
-
-	glRotatef(mY, 0.0f, 1.0f, 0.0f);
-
-
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	GLfloat aspectRatio = (window_width > window_height) ? float(window_width) / float(window_height) : float(window_height) / float(window_width);
-	GLfloat fH = tan(float(fieldOfView / 2)) * neaar;
-	GLfloat fW = fH * aspectRatio;
-	glFrustum(-1, 1, -1, 1, neaar, faar);
-
-	displayGridAndAxis();
-	displayCubes();
-	for (int i = 0; i < numM; i++)
-		modelos[i].desenha();
-	displayPalette();
-	//displayNurbs();
-	glFlush();
-	glutPostRedisplay();
-}
 void runOpenCV(){
 
 	cap >> img_scene;
+	
 
+	if (cap.get(CV_CAP_PROP_POS_FRAMES) == 410)
+	{
+		cap.set(CV_CAP_PROP_POS_FRAMES, 5);
+	}
 	if (img_scene.empty())
-		exit;
+		return;
 
 	Mat gray;
 
@@ -956,22 +903,28 @@ void runOpenCV(){
 	line(img_matches, scene_corners[1] + Point2f(img_object.cols, 0), scene_corners[2] + Point2f(img_object.cols, 0), Scalar(0, 255, 0), 4);
 	line(img_matches, scene_corners[2] + Point2f(img_object.cols, 0), scene_corners[3] + Point2f(img_object.cols, 0), Scalar(0, 255, 0), 4);
 	line(img_matches, scene_corners[3] + Point2f(img_object.cols, 0), scene_corners[0] + Point2f(img_object.cols, 0), Scalar(0, 255, 0), 4);
+	
+	//-- Show detected matches
+	imshow("Good Matches & Object detection", img_matches);
+	
+	
+	// CODIGO QUE TAVA DANDO ERRO QUE RODRIGO PEDIU PRA IGNORAR
 
-
-
-
+	/**
 	rvec = Mat(rv);
 	double _d[9] = { 1, 0, 0, 0, -1, 0, 0, 0, -1 };
 	Rodrigues(Mat(3, 3, CV_64FC1, _d), rvec);
 	tv[0] = 0; tv[1] = 0; tv[2] = 1;
 	tvec = Mat(tv);
-	/*
+
+	
 	double _cm[9] = { 20, 0, 160,
 	0, 20, 120,
 	0, 0, 1 };
 	camMatrix = Mat(3, 3, CV_64FC1, _cm);
 
-	*/
+	
+	
 	// MATRIZ DE PARAMETROS INTRINSECOS
 	double _cm[9] = { 350.47574, 0.00000, 158.25000,
 		0.00000, 363.04709, 120.75000,
@@ -979,7 +932,9 @@ void runOpenCV(){
 
 	camMatrix = Mat(3, 3, CV_64FC1, _cm);
 
-	double _dc[] = { 0, 0, 0, 0 };
+	double _dc[] = { 0, 0, 0, 0 };	
+	
+	
 	solvePnPRansac(obj, scene, camMatrix, Mat(1, 4, CV_64FC1, _dc), rvec, tvec, true);
 	//std::cout<<tvec;
 
@@ -999,12 +954,70 @@ void runOpenCV(){
 	printf("euler angles: %.5f %.5f %.5f\n", eav[0], eav[1], eav[2]);
 
 
-
-	//-- Show detected matches
-	imshow("Good Matches & Object detection", img_matches);
+	*/
 
 
 
+}
+
+void mydisplay()
+{
+
+	runOpenCV();
+
+	//GLUUUUT
+	/*-----------------------------------------------------------------------------------------------*/
+	/*-----------------------------------------------------------------------------------------------*/
+	/*-----------------------------------------------------------------------------------------------*/
+	/*A IDEIA É SUBSTITUIR AS MATRIZES Ri Rj Rk por _r[0...8] e T[] por tvec*/
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
+	glEnable(GL_TEXTURE_2D);
+	glEnable(GL_LIGHTING);
+
+	glClearColor(0, 0, 0, 0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glLoadIdentity();
+
+	//calculando R*C
+
+	T[0] = Ri[0] * C[0] + Rj[0] * C[1] + Rk[0] * C[2];
+	T[1] = Ri[1] * C[0] + Rj[1] * C[1] + Rk[1] * C[2];
+	T[2] = Ri[2] * C[0] + Rj[2] * C[1] + Rk[2] * C[2];
+
+
+
+
+	//obs.: tanto R quanto T estão transpostas por conta do formato de modelview exigido pelo OpenGL
+	GLfloat parametrosExtrinsecos[16] = {
+		Ri[0], Ri[1], Ri[2], 0.0f,
+		Rj[0], Rj[1], Rj[2], 0.0f,
+		Rk[0], Rk[1], Rk[2], 0.0f,
+		T[0], T[1], T[2], 1.0f };
+
+
+
+	glMatrixMode(GL_MODELVIEW);
+	glLoadMatrixf(parametrosExtrinsecos);
+
+	glRotatef(mY, 0.0f, 1.0f, 0.0f);
+
+
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	GLfloat aspectRatio = (window_width > window_height) ? float(window_width) / float(window_height) : float(window_height) / float(window_width);
+	GLfloat fH = tan(float(fieldOfView / 2)) * neaar;
+	GLfloat fW = fH * aspectRatio;
+	glFrustum(-1, 1, -1, 1, neaar, faar);
+
+	displayGridAndAxis();
+	displayCubes();
+	for (int i = 0; i < numM; i++)
+		modelos[i].desenha();
+	displayPalette();
+	//displayNurbs();
+	glFlush();
+	glutPostRedisplay();
 }
 //n usa
 void norma(GLfloat * a){
@@ -1295,6 +1308,11 @@ int main(int argc, char **argv)
 
 	for (int i = 0; i < numM; i++)
 		modelos[i].carregar(objStr[i], i);
+
+	detector.detect(img_object, keypoints_object);
+
+	//-- Step 2: Calculate descriptors (feature vectors)
+	extractor.compute(img_object, keypoints_object, descriptors_object);
 
 	glutDisplayFunc(mydisplay);
 	glutReshapeFunc(myreshape);
