@@ -330,7 +330,7 @@ struct obj{
 };
 
 obj modelos[10];
-int numM = 2;
+int numM = 0;
 
 #define SMALL_NUM   0.0000001 // anything that avoids division overflow
 // dot product (3D) which allows vector operations in arguments
@@ -350,8 +350,8 @@ void myinit()
 
 	//posicao da camera em relação ao mundo
 	C[0] = 0.0f;
-	C[1] = -5.0f;
-	C[2] = -30.0f;
+	C[1] = -3.0f;
+	C[2] = -50.0f;
 	T[0] = T[1] = T[2] = 0;
 
 	//objeto em relação a camera
@@ -581,12 +581,12 @@ void displayGridAndAxis(){
 	glLineWidth(1);
 	glColor3f(1, 1, 1);
 	glBegin(GL_LINES);
-	for (int i = -30; i <= 30; ++i) {
-		glVertex3f(i, -0.1, -30);
-		glVertex3f(i, -0.1, 30);
+	for (int i = -15; i <= 15; ++i) {
+		glVertex3f(i, -15, -0.1);
+		glVertex3f(i, 15, -0.1);
 
-		glVertex3f(30, -0.1, i);
-		glVertex3f(-30, -0.1, i);
+		glVertex3f(15, i, -0.1);
+		glVertex3f(-15, i, -0.1);
 	}
 	glEnd();
 
@@ -701,7 +701,7 @@ void runOpenCV(){
 	
 	// CODIGO QUE TAVA DANDO ERRO QUE RODRIGO PEDIU PRA IGNORAR
 
-	/**
+	
 	rvec = Mat(rv);
 	double _d[9] = { 1, 0, 0, 0, -1, 0, 0, 0, -1 };
 	Rodrigues(Mat(3, 3, CV_64FC1, _d), rvec);
@@ -709,15 +709,16 @@ void runOpenCV(){
 	tvec = Mat(tv);
 
 	
-	double _cm[9] = { 20, 0, 160,
+	/*double _cm[9] = { 20, 0, 160,
 	0, 20, 120,
 	0, 0, 1 };
-	camMatrix = Mat(3, 3, CV_64FC1, _cm);
+	camMatrix = Mat(3, 3, CV_64FC1, _cm);*/
 
 	
 	
 	// MATRIZ DE PARAMETROS INTRINSECOS
-	double _cm[9] = { 350.47574, 0.00000, 158.25000,
+	double _cm[9] = { 
+		350.47574, 0.00000, 158.25000,
 		0.00000, 363.04709, 120.75000,
 		0.00000, 0.00000, 1.00000 };
 
@@ -725,19 +726,52 @@ void runOpenCV(){
 
 	double _dc[] = { 0, 0, 0, 0 };	
 	
+	std::vector<Point3f> obj1;
+	for (int i = 0; i < good_matches.size(); i++)
+	{
+		obj1.push_back(Point3f(obj[i].x, obj[i].y, 0));
+	}
 	
-	solvePnPRansac(obj, scene, camMatrix, Mat(1, 4, CV_64FC1, _dc), rvec, tvec, true);
+
+
+	solvePnPRansac(obj1, scene, camMatrix, Mat(1, 4, CV_64FC1, _dc), rvec, tvec, true);
 	//std::cout<<tvec;
 
 	Mat rotM(3, 3, CV_64FC1, rot);
 	Rodrigues(rvec, rotM);
 	double* _r = rotM.ptr<double>();
 	printf("rotation mat: \n %.3f %.3f %.3f\n%.3f %.3f %.3f\n%.3f %.3f %.3f\n",
-		_r[0], _r[1], _r[2], _r[3], _r[4], _r[5], _r[6], _r[7], _r[8]);
+		_r[0], _r[1], _r[2], 
+		_r[3], _r[4], _r[5], 
+		_r[6], _r[7], _r[8]);
 
+	Ri[0] = _r[0];
+	Ri[1] = _r[1];
+	Ri[2] = _r[2];
+	Rj[0] = _r[3];
+	Rj[1] = _r[4];
+	Rj[2] = _r[5];
+	Rk[0] = _r[6];
+	Rk[1] = _r[7];
+	Rk[2] = _r[8];
+
+	/*for (int i = 0; i <9; i++)
+	{
+		Ri[i] = _r[i];
+
+	}*/
+
+	std::vector<uchar> array;
+	array.assign(tvec.datastart, tvec.dataend);
+	
+	T[0] = array[0];
+	T[1] = array[1];
+	T[2] = array[2];
 
 	Mat tmp, tmp1, tmp2, tmp3, tmp4, tmp5;
-	double _pm[12] = { _r[0], _r[1], _r[2], 0,
+
+	double _pm[12] = {
+		_r[0], _r[1], _r[2], 0,
 		_r[3], _r[4], _r[5], 0,
 		_r[6], _r[7], _r[8], 0 };
 	decomposeProjectionMatrix(Mat(3, 4, CV_64FC1, _pm), tmp, tmp1, tmp2, tmp3, tmp4, tmp5, eav);
@@ -745,16 +779,14 @@ void runOpenCV(){
 	printf("euler angles: %.5f %.5f %.5f\n", eav[0], eav[1], eav[2]);
 
 
-	*/
-
-
+	
 
 }
 
 void mydisplay()
 {
 
-	runOpenCV();
+	
 
 	//GLUUUUT
 	/*-----------------------------------------------------------------------------------------------*/
@@ -771,6 +803,8 @@ void mydisplay()
 	glLoadIdentity();
 
 	//calculando R*C
+	runOpenCV();
+
 
 	T[0] = Ri[0] * C[0] + Rj[0] * C[1] + Rk[0] * C[2];
 	T[1] = Ri[1] * C[0] + Rj[1] * C[1] + Rk[1] * C[2];
@@ -802,7 +836,7 @@ void mydisplay()
 	glFrustum(-1, 1, -1, 1, neaar, faar);
 
 	displayGridAndAxis();
-	displayCubes();
+	//displayCubes();
 	for (int i = 0; i < numM; i++)
 		modelos[i].desenha();
 	displayPalette();
