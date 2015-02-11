@@ -47,7 +47,8 @@ bool g_keys[256] = { false };
 GLfloat window_width = 600.0;
 GLfloat window_height = 600.0;
 
-//opencv variables
+
+// @OPENCV VARIABLES
 vector<double> rv(3), tv(3);
 Mat rvec(rv), tvec(tv);
 Mat camMatrix;
@@ -55,9 +56,9 @@ double rot[9] = { 0 };
 Vec3d eav;
 
 Mat img_object = imread("Resources\\book.png", CV_LOAD_IMAGE_GRAYSCALE);
-//Mat img_scene = imread("book2.jpg", CV_LOAD_IMAGE_GRAYSCALE);
 VideoCapture cap("Resources\\video.mp4");
 Mat img_scene;
+
 //-- Step 1: Detect the keypoints using SURF Detector
 int minHessian = 400;
 SurfFeatureDetector detector(minHessian);
@@ -65,9 +66,18 @@ std::vector<KeyPoint> keypoints_object, keypoints_scene;
 SurfDescriptorExtractor extractor;
 Mat descriptors_object, descriptors_scene;
 
+// @OPENCV VARIABLES END
+
+
+
 //base do sistema = vetores coluna na matriz de rotação (R). obs.: a matriz NÃO está transposta
 int selObj = 0;
 bool fullscreen = false;
+
+int mousex, mousey;
+
+// Function to deal with mouse position changes, called whenever the mouse cursorm moves
+double mX = 0, mY = 0;
 
 GLfloat Ri[3];
 GLfloat Rj[3];
@@ -77,7 +87,6 @@ GLfloat Rk[3];
 
 GLfloat C[3];
 GLfloat T[3];
-
 
 
 double zoom = 0.5;
@@ -124,14 +133,6 @@ float escala;
 
 Ray R;
 
-int quantPontos = 0;
-int quantControlPoints = 0;
-
-vector <Ponto> bezier;
-vector <vector <Ponto>> controlPoints;
-vector <vector <GLfloat>> weights;
-vector <Ponto> nurbs;
-vector <Ponto> nurbsCurve;
 
 int valN, valM;
 int avaliacoes = 100;
@@ -215,85 +216,6 @@ struct obj{
 				pol.push_back(f);
 			}
 		}
-	}
-	void readNURBS(string path){
-		ifstream file;
-		file.open(path);
-		char aux = ' ';
-
-		valN = 0;
-		valM = 0;
-
-		float pointX, pointY, pointZ, weight;
-
-		controlPoints.clear();
-		weights.clear();
-
-		if (file.is_open()) {
-			int i = 0, cont = 0;
-
-			while (i++ < 6) {
-				file >> aux;
-				file.ignore(512, '\n');
-			}
-
-			file >> aux;
-			file >> valN;
-
-			file >> aux;
-			file >> valM;
-
-			i = 0;
-
-			while (i++ < valM) {
-				vector <Ponto> temp;
-				vector <GLfloat> auxW;
-				controlPoints.push_back(temp);
-				weights.push_back(auxW);
-			}
-
-			i = 0;
-
-			while (i++ < 2) {
-				file >> aux;
-				file.ignore(512, '\n');
-			}
-
-			i = valN; //*valM;
-
-			printf("N %d\nM %d\n\n", valN, valM);
-
-			while (i > 0) {
-				file >> pointX >> pointY >> pointZ >> weight;
-
-				controlPoints.at(cont).push_back({ pointX, pointY, pointZ });
-				weights.at(cont).push_back(weight);
-
-				Ponto p = controlPoints.at(cont).back();
-
-				printf("%f %f %f %f\n", p.x, p.y, p.z, weights.at(cont).back());
-
-				i--;
-
-				if (i == 0) {
-					cont++;
-
-					if (cont < valM)
-						i = valN;
-
-					printf("#\n");
-				}
-			}
-
-			file >> aux;
-			file.ignore(512, '\n');
-		}
-		else
-			perror("Erro: ");
-
-		printf("\nQuantidade de pontos: %d\n", controlPoints.size());
-
-		file.close();
 	}
 
 	//x∗(P1−P0) + y∗(P2−P0) = P−P0
@@ -414,134 +336,6 @@ int numM = 2;
 // dot product (3D) which allows vector operations in arguments
 #define dot(u,v)   ((u).x * (v).x + (u).y * (v).y + (u).z * (v).z)
 
-// fat de i até n
-unsigned long long fat(int n, int i){
-	unsigned long long ret = 1;
-
-	for (; i <= n; i++)
-		ret *= i;
-
-	return ret;
-}
-
-// binomial (20, 3)
-unsigned long long binomial(int n, int i){
-	return (fat(n, n - i + 1) / fat(i, 2));
-}
-
-// retorna valor para um ponto da curva referente ao parâmetro dado
-GLfloat bernstein(int n, double t, int i) {
-	return ((double)binomial(n, i))*pow(1 - t, n - i)*pow(t, i);
-}
-
-void evaluateBezierSurface() {
-	GLfloat resBerns = 0.0;
-	GLfloat coordX = 0.0, coordY = 0.0, coordZ = 0.0;
-
-	for (double u = 0.0; u <= 1.0f; u += 1.0f / (avaliacoes + 1)) {
-		for (double v = 0.0; v <= 1.0f; v += 1.0f / (avaliacoes / 2 + 1)) {
-			for (int k = 1; k < valM; k++) {
-				for (int l = 1; l < valN; l++) {
-					resBerns = bernstein(valM, u, k) * bernstein(valN, v, l);
-
-					coordX += resBerns * controlPoints.at(k).at(l).x;
-					coordY += resBerns * controlPoints.at(k).at(l).y;
-					coordZ += resBerns * controlPoints.at(k).at(l).z;
-				}
-			}
-
-			bezier.push_back({ coordX, coordY, coordZ });
-
-			coordX = 0.0;
-			coordY = 0.0;
-			coordZ = 0.0;
-		}
-	}
-}
-
-void displayNurbs() {
-	GLfloat berns = 1.0;
-
-	bezier.clear();
-	nurbs.clear();
-	nurbsCurve.clear();
-
-	glPointSize(3.5);
-	glColor3f(0.8, 0.3, 0.7);
-	glBegin(GL_POINTS);
-	for (int l = 0; l < controlPoints.size(); l++)
-	for (int h = 0; h < controlPoints.at(l).size(); h++) {
-		glVertex3f(controlPoints.at(l).at(h).x, controlPoints.at(l).at(h).y, controlPoints.at(l).at(h).z);
-	}
-	glEnd();
-
-	evaluateBezierSurface();
-
-	glColor3f(0.8, 1.0, 0.2);
-	glLineWidth(1.5);
-	glBegin(GL_LINE_STRIP);
-	for (int w = 0; w < bezier.size(); w++) {
-		glVertex3f(bezier.at(w).x, bezier.at(w).y, bezier.at(w).z);
-	}
-	glEnd();
-}
-int rayPolygon(Ray R, Triangle T)
-{
-	Vector1    u, v, n;              // triangle vectors
-	Vector1    dir, w0, w;           // ray vectors
-	double     r, a, b;              // params to calc ray-plane intersect
-
-	// get triangle edge vectors and plane normal
-	//printf("t %lf %lf %lf\n", T.V0.x, T.V1.x, T.V2.x);
-
-	u = T.V1 - T.V0;
-	v = T.V2 - T.V0;
-	n = u * v;
-	//printf("n %lf %lf %lf\n", n.x, n.y, n.z);
-
-	Vector1 zero(0, 0, 0);// cross product
-	if (n.x == 0 && n.y  && n.z)             // triangle is degenerate
-		return -1;                  // do not deal with this case
-
-	dir = R.P1 - R.P0;              // ray direction vector
-	w0 = R.P0 - T.V0;
-	a = -dot(n, w0);
-	b = dot(n, dir);
-	if (fabs(b) < SMALL_NUM) {     // ray is  parallel to triangle plane
-		if (a == 0)                 // ray lies in triangle plane
-			return 2;
-		else return 0;              // ray disjoint from plane
-	}
-
-	// get intersect point of ray with triangle plane
-	r = a / b;
-	if (r < 0.0)                    // ray goes away from triangle
-		return 0;                   // => no intersect
-	// for a segment, also test if (r > 1.0) => no intersect
-
-	Vector1 I = R.P0 + (dir * r);            // intersect point of ray and plane
-
-	// is I inside T?
-	float    uu, uv, vv, wu, wv, D;
-	uu = dot(u, u);
-	uv = dot(u, v);
-	vv = dot(v, v);
-	w = I - T.V0;
-	wu = dot(w, u);
-	wv = dot(w, v);
-	D = uv * uv - uu * vv;
-
-	// get and test parametric coords
-	float s, t;
-	s = (uv * wv - vv * wu) / D;
-	if (s < 0.0 || s > 1.0)         // I is outside T
-		return 0;
-	t = (uv * wu - uu * wv) / D;
-	if (t < 0.0 || (s + t) > 1.0)  // I is outside T
-		return 0;
-
-	return 1;                       // I is in T
-}
 
 void myinit()
 {
@@ -713,10 +507,7 @@ void displayPalette(){
 	glMatrixMode(GL_MODELVIEW);
 }
 
-int mousex, mousey;
 
-// Function to deal with mouse position changes, called whenever the mouse cursorm moves
-double mX = 0, mY = 0;
 
 void handleMouseMove(int mouseX, int mouseY)
 {
